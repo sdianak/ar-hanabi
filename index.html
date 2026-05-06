@@ -2,90 +2,97 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>WebAR Firework Alpha</title>
-    <!-- 必要なライブラリ：A-Frame 1.4.0 と パーティクルシステム -->
+    <title>WebAR Firework Final</title>
+    <!-- A-Frame本体のみを使用 -->
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-particle-system-component@master/dist/aframe-particle-system-component.min.js"></script>
-    
     <style>
-        body { margin: 0; overflow: hidden; }
+        body { margin: 0; overflow: hidden; background-color: black; }
         .ui { position: fixed; bottom: 30px; width: 100%; text-align: center; z-index: 1000; }
         button { 
-            padding: 15px 30px; font-size: 18px; border-radius: 30px; border: none; 
+            padding: 20px 40px; font-size: 20px; border-radius: 40px; border: none; 
             background: linear-gradient(45deg, #FF0080, #FF8C00); color: white; font-weight: bold;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 20px rgba(255,0,128,0.4);
         }
-        /* カメラ映像を背景に固定 */
         #webcam { position: fixed; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: -1; }
     </style>
 </head>
 <body>
-    <!-- 生のカメラ映像（実写）を表示 -->
     <video id="webcam" autoplay playsinline></video>
 
-    <!-- A-Frameシーン：背景を透明にしてカメラに重ねる（alpha: true） -->
-    <!-- 写真保存を一旦捨てて preserveDrawingBuffer も off にしてみます -->
-    <a-scene embedded vr-mode-ui="enabled: false" renderer="alpha: true;">
-        
-        <!-- 背景（a-sky）を完全に透明にする（opacity="0"） -->
-        <a-sky id="sky" opacity="0"></a-sky> 
-        
-        <!-- 花火（パーティクル）：位置、色、粒の大きさ、広がりをおしゃれに調整 -->
-        <!-- colorをピンク、水色、金にしました。presetはdustに変更 -->
-        <a-entity id="firework" position="0 2 -3" 
-            particle-system="
-                preset: dust; 
-                texture: https://cdn.rawgit.com/mrdoob/three.js/master/examples/textures/sprites/spark1.png;
-                color: #FF0080, #00FFFF, #FFD700; 
-                size: 2.0; 
-                particleCount: 1200; 
-                velocityValue: 0 6 0; 
-                velocitySpread: 8 8 8; 
-                accelerationValue: 0 -3 0;
-                duration: 1.2;
-                enabled: false">
-        </a-entity>
-        
+    <a-scene embedded vr-mode-ui="enabled: false" renderer="alpha: true; antialias: true;">
+        <a-sky opacity="0"></a-sky>
+
+        <!-- 花火の親要素（ここをプログラムで動かす） -->
+        <a-entity id="firework-group" position="0 2 -3"></a-entity>
+
         <a-entity camera></a-entity>
     </a-scene>
 
     <div class="ui">
-        <button onclick="launch()">花火を上げる！</button>
+        <button onclick="launchFirework()">花火を打ち上げる！</button>
     </div>
 
     <script>
-        // カメラを起動する関数
-        async function startCamera() {
-            const video = document.getElementById('webcam');
+        // カメラ起動
+        async function initCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-                video.srcObject = stream;
+                document.getElementById('webcam').srcObject = stream;
             } catch (err) {
-                alert("カメラの起動に失敗しました（Safariのカメラ許可を確認してください）: " + err);
+                console.error("Camera error:", err);
             }
         }
 
-        // 花火を起動する関数
-        function launch() {
-            const fw = document.getElementById('firework');
+        function launchFirework() {
+            const group = document.getElementById('firework-group');
+            // 既存の花火をクリア
+            group.innerHTML = '';
             
-            // 每次少し位置を変えて「打ち上げ感」を出す（室内なので手前に）
-            const x = (Math.random() - 0.5) * 3;
-            const y = (Math.random() * 1.5 + 1.5); // 高さも変える
-            const z = -(Math.random() * 2 + 2); // 2m〜4m先に
-            fw.setAttribute('position', `${x} ${y} ${z}`);
+            // 打ち上げ位置をランダムに設定（室内に合わせて手前）
+            const x = (Math.random() - 0.5) * 2;
+            const y = 1.5 + Math.random();
+            const z = -2 - Math.random();
+            group.setAttribute('position', `${x} ${y} ${z}`);
+
+            // 15球の火花を生成（標準のa-sphereのみを使用）
+            const colors = ['#FF0080', '#00FFFF', '#FFD700', '#FF8C00', '#FFFFFF'];
             
-            // パーティクルを起動
-            fw.setAttribute('particle-system', 'enabled', 'true');
-            
-            // 2.0秒後に停止（リセット）
-            setTimeout(() => {
-                fw.setAttribute('particle-system', 'enabled', 'false');
-            }, 2000);
+            for (let i = 0; i < 15; i++) {
+                const spark = document.createElement('a-sphere');
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                
+                // 初期の小さな粒
+                spark.setAttribute('radius', '0.05');
+                spark.setAttribute('color', color);
+                spark.setAttribute('material', 'shader: flat; emissive: ' + color);
+                
+                // 飛び散る方向をランダムに計算
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.random() * Math.PI;
+                const dist = 1.5; // 飛び散る距離
+                const tx = dist * Math.sin(phi) * Math.cos(theta);
+                const ty = dist * Math.sin(phi) * Math.sin(theta);
+                const tz = dist * Math.cos(phi);
+
+                // アニメーション：飛び散りながら消える
+                spark.setAttribute('animation__move', {
+                    property: 'position',
+                    to: `${tx} ${ty} ${tz}`,
+                    dur: 1000,
+                    easing: 'easeOutExpo'
+                });
+                spark.setAttribute('animation__scale', {
+                    property: 'scale',
+                    to: '0 0 0',
+                    dur: 1000,
+                    easing: 'easeInQuad'
+                });
+
+                group.appendChild(spark);
+            }
         }
 
-        // ページ読み込み時にカメラ起動
-        window.addEventListener('load', startCamera);
+        window.addEventListener('load', initCamera);
     </script>
 </body>
 </html>
