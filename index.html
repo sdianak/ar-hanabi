@@ -2,19 +2,16 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>WebAR Firework - Environment Mode</title>
+    <title>WebAR Firework - Photo Save Version</title>
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
-        /* 背面カメラ映像を全画面に配置 */
         #webcam {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             object-fit: cover; z-index: -1;
         }
-        /* 3D描画レイヤー */
         a-scene { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; }
         
-        /* UIボタン */
         .ui-container { position: fixed; bottom: 40px; width: 100%; display: flex; justify-content: center; gap: 20px; z-index: 100; }
         button { 
             padding: 15px 25px; font-size: 16px; border-radius: 50px; border: none; 
@@ -27,9 +24,9 @@
     </style>
 </head>
 <body>
-    <!-- 外カメラの映像を表示するビデオタグ -->
     <video id="webcam" autoplay playsinline></video>
 
+    <!-- preserveDrawingBuffer: true が保存には必須 -->
     <a-scene embedded vr-mode-ui="enabled: false" renderer="alpha: true; preserveDrawingBuffer: true;">
         <a-entity id="firework-anchor"></a-entity>
         <a-entity camera></a-entity>
@@ -37,51 +34,36 @@
 
     <div class="ui-container">
         <button class="btn-launch" onclick="startShow()">花火を連発！</button>
-        <button class="btn-capture" onclick="takePhoto()">写真を撮る</button>
+        <button class="btn-capture" onclick="takePhoto()">保存する</button>
     </div>
 
     <script>
-        // 外カメラ（背面カメラ）を指定して起動
-        const constraints = {
-            video: { facingMode: "environment" }
-        };
-
+        // 外カメラを起動
+        const constraints = { video: { facingMode: "environment" } };
         navigator.mediaDevices.getUserMedia(constraints)
-            .then(s => { 
-                document.getElementById('webcam').srcObject = s; 
-            })
-            .catch(err => {
-                console.error("Camera error:", err);
-                alert("カメラの起動に失敗しました。設定を確認してください。");
-            });
+            .then(s => { document.getElementById('webcam').srcObject = s; })
+            .catch(err => { alert("カメラの起動に失敗しました。設定を確認してください。"); });
 
         let isLaunching = false;
 
         function startShow() {
             if (isLaunching) return;
             isLaunching = true;
-            
             let count = 0;
             const interval = setInterval(() => {
                 createFirework();
                 count++;
-                if (count > 15) { // 15発
-                    clearInterval(interval);
-                    isLaunching = false;
-                }
+                if (count > 15) { clearInterval(interval); isLaunching = false; }
             }, 350);
         }
 
         function createFirework() {
             const anchor = document.getElementById('firework-anchor');
             const group = document.createElement('a-entity');
-            
-            // 外の景色に合うよう、位置をランダムに分散
             const rx = (Math.random() - 0.5) * 8;
             const ry = 1 + Math.random() * 4;
             const rz = -3 - Math.random() * 3;
             group.setAttribute('position', `${rx} ${ry} ${rz}`);
-            
             anchor.appendChild(group);
 
             const colors = ['#FF69B4', '#FFD700', '#FFFFFF', '#00FFFF', '#ADFF2F', '#FF4500'];
@@ -97,28 +79,49 @@
                 const phi = Math.random() * Math.PI;
                 const speed = 1.2 + Math.random() * 2;
                 const tx = speed * Math.sin(phi) * Math.cos(theta);
-                const ty = speed * Math.sin(phi) * Math.sin(theta) - 0.4; // 重力で少し落ちる
+                const ty = speed * Math.sin(phi) * Math.sin(theta) - 0.4;
                 const tz = speed * Math.cos(phi);
 
                 spark.setAttribute('animation__pos', `property: position; to: ${tx} ${ty} ${tz}; dur: 1600; easing: easeOutExpo`);
                 spark.setAttribute('animation__opc', `property: material.opacity; from: 1; to: 0; dur: 1600; easing: easeInSine`);
                 spark.setAttribute('animation__scl', `property: scale; from: 1 1 1; to: 0 0 0; dur: 1600; easing: easeInQuad`);
-                
                 group.appendChild(spark);
             }
-
-            setTimeout(() => { 
-                if(anchor.contains(group)) anchor.removeChild(group); 
-            }, 2500);
+            setTimeout(() => { if(anchor.contains(group)) anchor.removeChild(group); }, 2500);
         }
 
-        function takePhoto() {
-            // 現在の画面を固定する演出
-            const btn = document.querySelector('.btn-capture');
-            btn.style.background = "#fff";
-            setTimeout(() => { btn.style.background = ""; }, 100);
+        async function takePhoto() {
+            const video = document.getElementById('webcam');
+            const scene = document.querySelector('a-scene');
+            const canvas = scene.renderer.domElement; // A-Frameの描画
 
-            alert("📸 綺麗に撮れましたか？\nスマホのスクリーンショット機能を使うと、背景と一緒に高画質で保存できます！");
+            // 合成用キャンバスを作成
+            const offscreenCanvas = document.createElement('canvas');
+            offscreenCanvas.width = video.videoWidth;
+            offscreenCanvas.height = video.videoHeight;
+            const ctx = offscreenCanvas.getContext('2d');
+
+            // 1. カメラ映像を描画
+            ctx.drawImage(video, 0, 0, offscreenCanvas.width, offscreenCanvas.height);
+            
+            // 2. A-Frameの内容を合成（サイズをカメラに合わせる）
+            ctx.drawImage(canvas, 0, 0, offscreenCanvas.width, offscreenCanvas.height);
+
+            // 3. 画像として書き出し
+            try {
+                const dataURL = offscreenCanvas.toDataURL('image/png');
+                const link = document.createElement('a');
+                link.download = `ar-firework-${Date.now()}.png`;
+                link.href = dataURL;
+                link.click();
+                
+                // iOSなどで自動ダウンロードされない場合の予備案内
+                setTimeout(() => {
+                    alert("📸 保存処理を開始しました。保存されない場合は、この画面をスクリーンショットしてください！");
+                }, 500);
+            } catch (e) {
+                alert("保存に失敗しました。ブラウザの制限かもしれません。スクショを撮ってください！");
+            }
         }
     </script>
 </body>
