@@ -2,53 +2,90 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>WebAR Simple Hanabi</title>
+    <title>WebAR Firework Alpha</title>
+    <!-- 必要なライブラリ：A-Frame 1.4.0 と パーティクルシステム -->
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-particle-system-component@master/dist/aframe-particle-system-component.min.js"></script>
+    
+    <style>
+        body { margin: 0; overflow: hidden; }
+        .ui { position: fixed; bottom: 30px; width: 100%; text-align: center; z-index: 1000; }
+        button { 
+            padding: 15px 30px; font-size: 18px; border-radius: 30px; border: none; 
+            background: linear-gradient(45deg, #FF0080, #FF8C00); color: white; font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        /* カメラ映像を背景に固定 */
+        #webcam { position: fixed; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: -1; }
+    </style>
 </head>
-<body style="margin: 0; overflow: hidden;">
-    <!-- debugUIEnabled: true にして、ARが動いているか視覚化します -->
-    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: true;" renderer="preserveDrawingBuffer: true;">
-        
-        <!-- 花火の代わりに「光る球体」を目の前に配置 -->
-        <a-sphere id="ball" position="0 1.5 -2" radius="0.2" color="yellow" visible="false"></a-sphere>
+<body>
+    <!-- 生のカメラ映像（実写）を表示 -->
+    <video id="webcam" autoplay playsinline></video>
 
+    <!-- A-Frameシーン：背景を透明にしてカメラに重ねる（alpha: true） -->
+    <!-- 写真保存を一旦捨てて preserveDrawingBuffer も off にしてみます -->
+    <a-scene embedded vr-mode-ui="enabled: false" renderer="alpha: true;">
+        
+        <!-- 背景（a-sky）を完全に透明にする（opacity="0"） -->
+        <a-sky id="sky" opacity="0"></a-sky> 
+        
+        <!-- 花火（パーティクル）：位置、色、粒の大きさ、広がりをおしゃれに調整 -->
+        <!-- colorをピンク、水色、金にしました。presetはdustに変更 -->
+        <a-entity id="firework" position="0 2 -3" 
+            particle-system="
+                preset: dust; 
+                texture: https://cdn.rawgit.com/mrdoob/three.js/master/examples/textures/sprites/spark1.png;
+                color: #FF0080, #00FFFF, #FFD700; 
+                size: 2.0; 
+                particleCount: 1200; 
+                velocityValue: 0 6 0; 
+                velocitySpread: 8 8 8; 
+                accelerationValue: 0 -3 0;
+                duration: 1.2;
+                enabled: false">
+        </a-entity>
+        
         <a-entity camera></a-entity>
     </a-scene>
 
-    <div style="position: fixed; bottom: 20px; width: 100%; text-align: center; z-index: 1000;">
-        <button onclick="blast()" style="padding: 20px; font-size: 20px;">花火を放つ</button>
-        <div id="shot-area"></div>
+    <div class="ui">
+        <button onclick="launch()">花火を上げる！</button>
     </div>
 
     <script>
-        function blast() {
-            const ball = document.querySelector('#ball');
-            // 目の前に黄色い玉を出して、大きくするアニメーション
-            ball.setAttribute('visible', 'true');
-            ball.setAttribute('animation', 'property: scale; from: 0.1 0.1 0.1; to: 5 5 5; dur: 500');
-            ball.setAttribute('animation__color', 'property: material.color; from: #FFFF00; to: #FF0000; dur: 500');
-            
-            setTimeout(() => { ball.setAttribute('visible', 'false'); }, 1000);
+        // カメラを起動する関数
+        async function startCamera() {
+            const video = document.getElementById('webcam');
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                video.srcObject = stream;
+            } catch (err) {
+                alert("カメラの起動に失敗しました（Safariのカメラ許可を確認してください）: " + err);
+            }
         }
 
-        // 最も確実に「写真」として保存させるための別アプローチ
-        function takePhoto() {
-            const scene = document.querySelector('a-scene');
-            const canvas = scene.components.screenshot.getCanvas('perspective');
+        // 花火を起動する関数
+        function launch() {
+            const fw = document.getElementById('firework');
             
-            // 画面内にプレビューとして画像を表示させる（これなら長押し保存できる）
-            const img = document.createElement('img');
-            img.src = canvas.toDataURL('image/png');
-            img.style.position = 'fixed';
-            img.style.top = '10px';
-            img.style.left = '10px';
-            img.style.width = '30%';
-            img.style.border = '2px solid white';
-            img.style.zIndex = '2000';
-            document.body.appendChild(img);
-            alert("左上にプレビューが出ました。長押しで保存してください");
+            // 每次少し位置を変えて「打ち上げ感」を出す（室内なので手前に）
+            const x = (Math.random() - 0.5) * 3;
+            const y = (Math.random() * 1.5 + 1.5); // 高さも変える
+            const z = -(Math.random() * 2 + 2); // 2m〜4m先に
+            fw.setAttribute('position', `${x} ${y} ${z}`);
+            
+            // パーティクルを起動
+            fw.setAttribute('particle-system', 'enabled', 'true');
+            
+            // 2.0秒後に停止（リセット）
+            setTimeout(() => {
+                fw.setAttribute('particle-system', 'enabled', 'false');
+            }, 2000);
         }
+
+        // ページ読み込み時にカメラ起動
+        window.addEventListener('load', startCamera);
     </script>
 </body>
 </html>
