@@ -2,61 +2,52 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>WebAR Safari対応版</title>
+    <title>WebAR Simple Hanabi</title>
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-particle-system-component@master/dist/aframe-particle-system-component.min.js"></script>
 </head>
-
 <body style="margin: 0; overflow: hidden;">
-    <!-- 修正点: rendererに antialiasとpreserveDrawingBufferを明示 -->
-    <a-scene embedded 
-             arjs="sourceType: webcam; debugUIEnabled: false;" 
-             renderer="antialias: true; preserveDrawingBuffer: true; alpha: true;">
+    <!-- debugUIEnabled: true にして、ARが動いているか視覚化します -->
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: true;" renderer="preserveDrawingBuffer: true;">
         
-        <!-- 花火：室内でも見えるよう、かなり近く(3m先)に出現させます -->
-        <a-entity id="firework" position="0 1.5 -3" 
-            particle-system="
-                preset: dust; 
-                texture: https://cdn.rawgit.com/mrdoob/three.js/master/examples/textures/sprites/spark1.png;
-                color: #FF0080, #00FFFF; 
-                size: 2; 
-                particleCount: 1000; 
-                velocityValue: 0 5 0; 
-                velocitySpread: 5 5 5; 
-                accelerationValue: 0 -2 0;
-                enabled: false">
-        </a-entity>
+        <!-- 花火の代わりに「光る球体」を目の前に配置 -->
+        <a-sphere id="ball" position="0 1.5 -2" radius="0.2" color="yellow" visible="false"></a-sphere>
 
         <a-entity camera></a-entity>
     </a-scene>
 
-    <div style="position: fixed; bottom: 30px; width: 100%; display: flex; justify-content: center; gap: 15px; z-index: 999;">
-        <button onclick="launch()" style="padding: 15px 25px; border-radius: 30px; background: #FF0080; color: white; border: none;">花火を放つ</button>
-        <button onclick="takePhoto()" style="padding: 15px 25px; border-radius: 30px; background: #00DBDE; color: white; border: none;">写真保存</button>
+    <div style="position: fixed; bottom: 20px; width: 100%; text-align: center; z-index: 1000;">
+        <button onclick="blast()" style="padding: 20px; font-size: 20px;">花火を放つ</button>
+        <div id="shot-area"></div>
     </div>
 
     <script>
-        function launch() {
-            const fw = document.querySelector('#firework');
-            // ボタンを押した瞬間に「visible」を切り替えることで確実に出現させます
-            fw.setAttribute('particle-system', 'enabled', 'true');
-            setTimeout(() => { fw.setAttribute('particle-system', 'enabled', 'false'); }, 2000);
+        function blast() {
+            const ball = document.querySelector('#ball');
+            // 目の前に黄色い玉を出して、大きくするアニメーション
+            ball.setAttribute('visible', 'true');
+            ball.setAttribute('animation', 'property: scale; from: 0.1 0.1 0.1; to: 5 5 5; dur: 500');
+            ball.setAttribute('animation__color', 'property: material.color; from: #FFFF00; to: #FF0000; dur: 500');
+            
+            setTimeout(() => { ball.setAttribute('visible', 'false'); }, 1000);
         }
 
+        // 最も確実に「写真」として保存させるための別アプローチ
         function takePhoto() {
-            // Safariでの撮影のコツ: 
-            // A-Frameのスクリーンショットコンポーネントを使用
             const scene = document.querySelector('a-scene');
-            const components = scene.components.screenshot;
+            const canvas = scene.components.screenshot.getCanvas('perspective');
             
-            // perspective(3D)カメラの映像を取得
-            const canvas = components.getCanvas('perspective');
-            
-            // Safariでは新しいタブで画像を開かせて、ユーザーに「長押し保存」してもらうのが一番確実です
-            const dataURL = canvas.toDataURL('image/png');
-            const newWindow = window.open();
-            newWindow.document.write('<img src="' + dataURL + '" style="width:100%"><p>画像を長押しして保存してください</p>');
+            // 画面内にプレビューとして画像を表示させる（これなら長押し保存できる）
+            const img = document.createElement('img');
+            img.src = canvas.toDataURL('image/png');
+            img.style.position = 'fixed';
+            img.style.top = '10px';
+            img.style.left = '10px';
+            img.style.width = '30%';
+            img.style.border = '2px solid white';
+            img.style.zIndex = '2000';
+            document.body.appendChild(img);
+            alert("左上にプレビューが出ました。長押しで保存してください");
         }
     </script>
 </body>
