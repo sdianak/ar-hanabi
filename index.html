@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Premium WebAR Firework</title>
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <!-- おしゃれなパーティクル用ライブラリ -->
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-particle-system-component@master/dist/aframe-particle-system-component.min.js"></script>
+    
+    <style>
+        .ui-container {
+            position: fixed; bottom: 30px; width: 100%;
+            display: flex; justify-content: center; gap: 20px; z-index: 999;
+        }
+        .btn {
+            padding: 15px 25px; border-radius: 30px; border: none;
+            color: white; font-weight: bold; font-size: 16px; cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        .btn-launch { background: linear-gradient(45deg, #FF0080, #FF8C00); }
+        .btn-photo { background: linear-gradient(45deg, #00DBDE, #FC00FF); }
+    </style>
+</head>
+
+<body style="margin: 0; overflow: hidden;">
+    <!-- preserveDrawingBufferは写真撮影に必須 -->
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;" 
+             renderer="preserveDrawingBuffer: true; alpha: true;">
+        
+        <a-assets>
+            <!-- ここに3Dモデル(.glb)を追加することも可能です -->
+        </a-assets>
+
+        <!-- 花火の本体：色や広がりをおしゃれに設定 -->
+        <a-entity id="firework" position="0 5 -10" 
+            particle-system="
+                preset: dust; 
+                texture: https://cdn.rawgit.com/mrdoob/three.js/master/examples/textures/sprites/spark1.png;
+                color: #FF0080,#FFD700,#00FFFF; 
+                size: 2; 
+                particleCount: 1000; 
+                velocityValue: 0 10 0; 
+                velocitySpread: 15 15 15; 
+                accelerationValue: 0 -5 0;
+                duration: 1;
+                enabled: false">
+        </a-entity>
+
+        <a-entity camera></a-entity>
+    </a-scene>
+
+    <div class="ui-container">
+        <button class="btn btn-launch" onclick="launch()">花火を放つ</button>
+        <button class="btn btn-photo" onclick="takePhoto()">記念撮影</button>
+    </div>
+
+    <script>
+        function launch() {
+            const fw = document.querySelector('#firework');
+            // ランダムな位置に移動
+            const x = (Math.random() - 0.5) * 10;
+            const z = -(Math.random() * 10 + 5);
+            fw.setAttribute('position', `${x} 5 ${z}`);
+            
+            // パーティクルを起動
+            fw.setAttribute('particle-system', 'enabled', 'true');
+            // 2秒後に停止（リセット）
+            setTimeout(() => {
+                fw.setAttribute('particle-system', 'enabled', 'false');
+            }, 2000);
+        }
+
+        function takePhoto() {
+            const scene = document.querySelector('a-scene');
+            const canvas = scene.components.screenshot.getCanvas('perspective');
+            const link = document.createElement('a');
+            link.download = 'AR_Firework.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+    </script>
+</body>
+</html>
